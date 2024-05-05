@@ -3,7 +3,7 @@ import struct as py_struct
 import zlib
 from dataclasses import dataclass
 from operator import attrgetter
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Union
 
 import cython
 from cython.cimports import zran
@@ -174,7 +174,7 @@ def build_deflate_index(input_bytes: bytes, span: off_t = 2**20) -> WrapperDefla
     return index
 
 
-def decompress(input_bytes: bytes, index: Index, offset: off_t, length: int) -> bytes:  # noqa
+def decompress(input_bytes: bytes, index: Union[Index, WrapperDeflateIndex], offset: off_t, length: int) -> bytes:  # noqa
     """Decompress a range of bytes from a compressed file.
 
     Args:
@@ -186,17 +186,26 @@ def decompress(input_bytes: bytes, index: Index, offset: off_t, length: int) -> 
     Returns:
         A bytes object containing the decompressed data.
     """
-    if offset + length > index.uncompressed_size:
+    zran_index = cython.declare(WrapperDeflateIndex)
+
+    if isinstance(index, WrapperDeflateIndex):
+        uncompressed_size = index.length
+    else:
+        uncompressed_size = index.uncompressed_size
+    if offset + length > uncompressed_size:
         raise ValueError('Offset and length specified would result in reading past the file bounds')
 
     compressed_data = cython.declare(cython.p_char, PyBytes_AsString(input_bytes))
     compressed_data_length = cython.declare(off_t, PyBytes_Size(input_bytes))
     infile = fmemopen(compressed_data, compressed_data_length, b"r")
 
-    rebuilt_index = cython.declare(WrapperDeflateIndex, index.to_c_index())
+    if not isinstance(index, WrapperDeflateIndex):
+        zran_index = index.to_c_index()
+    else:
+        zran_index = index
     uncompressed_data_length = (length + 1) * cython.sizeof(cython.uchar)
     data = cython.declare(cython.p_uchar, cython.cast(cython.p_uchar, PyMem_Malloc(uncompressed_data_length)))
-    rtc_extract = zran.deflate_index_extract(infile, rebuilt_index._ptr, offset, data, length)
+    rtc_extract = zran.deflate_index_extract(infile, zran_index._ptr, offset, data, length)
 
     try:
         check_for_error(rtc_extract)
