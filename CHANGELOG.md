@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [PEP 440](https://www.python.org/dev/peps/pep-0440/)
 and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1]
+### Changed
+* Definition of `Point` class so that `__repr__` function does not need to be specified.
+* `get_closest_point` to use `bisect`, speeding up function.
+
+### Added
+* Comparison method to `Point` class to simplify sort implementation.
+
 ## [0.1.0]
 ### Fixed
 * Bug that would not allow you to create a valid modified index if the first point had a non-zero bits property

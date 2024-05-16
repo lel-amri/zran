@@ -1,8 +1,10 @@
 # vim: filetype=python
+import bisect
 import os
 import struct as py_struct
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import total_ordering
 from operator import attrgetter
 from typing import Any, Iterable, List, Optional, Union
 
@@ -10,7 +12,7 @@ import cython
 from cython.cimports import zran
 from cython.cimports.cpython.bytes import PyBytes_AsString, PyBytes_Size
 from cython.cimports.cpython.mem import PyMem_Free, PyMem_Malloc
-from cython.cimports.libc.stdio import fclose, FILE
+from cython.cimports.libc.stdio import FILE, fclose
 from cython.cimports.libc.stdlib import malloc
 from cython.cimports.posix.stdio import fdopen, fmemopen
 from cython.cimports.posix.types import off_t
@@ -63,6 +65,7 @@ def check_for_error(return_code: int):
             raise ZranError(f"zran: failed with error code {return_code}")
 
 
+@total_ordering
 @dataclass(frozen=True)
 class Point:
     """A dataclass representing a point in a zran index."""
@@ -70,10 +73,10 @@ class Point:
     outloc: int
     inloc: int
     bits: int
-    window: bytes
+    window: bytes = field(repr=False)
 
-    def __repr__(self):
-        return f'Point(outloc={self.outloc}, inloc={self.inloc}, bits={self.bits})'
+    def __lt__(self, other: Point) -> bool:  # noqa: F821
+        return self.outloc < other.outloc
 
 
 @cython.cclass
@@ -198,7 +201,7 @@ def decompress(input: Union[bytes, Any], index: Index, offset: off_t, length: in
         A bytes object containing the decompressed data.
     """
     if offset + length > index.uncompressed_size:
-        raise ValueError('Offset and length specified would result in reading past the file bounds')
+        raise ValueError("Offset and length specified would result in reading past the file bounds")
 
     infile = coerce_to_posix_stream(input)
 
@@ -282,7 +285,7 @@ class Index:
         window_data = []
         for i in range(have):
             loc_bytes = dflidx[header_length + (i * point_length) : header_length + ((i + 1) * point_length)]
-            loc_data.append(py_struct.unpack('<QQB', loc_bytes))
+            loc_data.append(py_struct.unpack("<QQB", loc_bytes))
 
             window_bytes = dflidx[point_end + (WINDOW_LENGTH * i) : point_end + (WINDOW_LENGTH * (i + 1))]
             window_data.append(window_bytes)
@@ -357,15 +360,10 @@ def get_closest_point(points: Iterable[Point], value: int, greater_than: bool = 
     Returns:
         closest Point
     """
-    sorted_points = sorted(points, key=attrgetter("outloc"))
+    sorted_points = sorted(points)
+    closest = bisect.bisect(sorted_points, Point(value, 0, 0, b""))
 
-    closest = 0
-    for i in range(len(sorted_points)):
-        if sorted_points[i].outloc <= value and sorted_points[i].outloc > sorted_points[closest].outloc:
-            closest = i
-
-    if greater_than:
-        closest += 1
-        closest = min(closest, len(sorted_points) - 1)
+    if (not greater_than) or (closest == len(sorted_points)):
+        closest -= 1
 
     return sorted_points[closest]
