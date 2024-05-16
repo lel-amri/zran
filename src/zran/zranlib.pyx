@@ -22,17 +22,6 @@ WINDOW_LENGTH = 32768
 GZ_WBITS = 31
 
 
-@cython.cfunc
-def coerce_to_posix_stream(input: Union[bytes, Any]) -> cython.pointer(FILE):
-    if isinstance(input, bytes):
-        compressed_data = cython.declare(cython.p_char, PyBytes_AsString(input))
-        compressed_data_length = cython.declare(off_t, PyBytes_Size(input))
-        fh = fmemopen(compressed_data, compressed_data_length, b"rb")
-    else:
-        fh = fdopen(dup(input.fileno()), b"rb")
-    return fh
-
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Cython Functionality~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 class ZranError(Exception):
     pass
@@ -63,6 +52,17 @@ def check_for_error(return_code: int):
             raise ZranError("zran: failed with Z_STREAM_ERROR")
         else:
             raise ZranError(f"zran: failed with error code {return_code}")
+
+
+@cython.cfunc
+def coerce_to_posix_stream(input: Union[bytes, Any]) -> cython.pointer(FILE):
+    if isinstance(input, bytes):
+        compressed_data = cython.declare(cython.p_char, PyBytes_AsString(input))
+        compressed_data_length = cython.declare(off_t, PyBytes_Size(input))
+        fh = fmemopen(compressed_data, compressed_data_length, b"rb")
+    else:
+        fh = fdopen(dup(input.fileno()), b"rb")
+    return fh
 
 
 @total_ordering
