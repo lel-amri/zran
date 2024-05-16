@@ -1,7 +1,7 @@
 # vim: filetype=python
+import bisect
 import struct as py_struct
 import zlib
-import bisect
 from dataclasses import dataclass, field
 from functools import total_ordering
 from operator import attrgetter
@@ -62,7 +62,7 @@ class Point:
     bits: int
     window: bytes = field(repr=False)
 
-    def __lt__(self, other: Point) -> bool:
+    def __lt__(self, other: Point) -> bool:  # noqa: F821
         return self.outloc < other.outloc
 
 
@@ -190,7 +190,7 @@ def decompress(input_bytes: bytes, index: Index, offset: off_t, length: int) -> 
         A bytes object containing the decompressed data.
     """
     if offset + length > index.uncompressed_size:
-        raise ValueError('Offset and length specified would result in reading past the file bounds')
+        raise ValueError("Offset and length specified would result in reading past the file bounds")
 
     compressed_data = cython.declare(cython.p_char, PyBytes_AsString(input_bytes))
     compressed_data_length = cython.declare(off_t, PyBytes_Size(input_bytes))
@@ -270,7 +270,7 @@ class Index:
         window_data = []
         for i in range(have):
             loc_bytes = dflidx[header_length + (i * point_length) : header_length + ((i + 1) * point_length)]
-            loc_data.append(py_struct.unpack('<QQB', loc_bytes))
+            loc_data.append(py_struct.unpack("<QQB", loc_bytes))
 
             window_bytes = dflidx[point_end + (WINDOW_LENGTH * i) : point_end + (WINDOW_LENGTH * (i + 1))]
             window_data.append(window_bytes)
